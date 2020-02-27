@@ -7,7 +7,7 @@ using System.IO;
 using System.Diagnostics;
 using System.Security;
 using System.Security.Authentication;
-
+using NflCalcXF.Services;
 
 namespace NflCalc {
 
@@ -53,102 +53,123 @@ namespace NflCalc {
       public static double HomeAdvantage;
 
 
-      public DateTime GetDataDate() {
+      public async Task<DateTime> GetDataDate() {
       // --------------------------------------------------------
          try {
             string s;
-            using (StreamReader f = NflCalcXF.Services.Repository.GetTextFileOnLine("DataDate")) {
-               s = f.ReadLine();
-               f.Close();
-            }
+            StringReader sr = await Repository.GetTextFileOnLine("DataDate");
+            if (sr == null) return DateTime.MinValue;
+
+            s = sr.ReadLine();
+            sr.Close();
             return DateTime.Parse(s);
-        }
+         }
          catch (Exception ex) {
-            throw ex;
+            return DateTime.MinValue;
          }
       }
 
 
-      public void FillSpreadTable() {
+      public async Task<bool> FillSpreadTable() {
       // --------------------------------------------------------
-         using (StreamReader f = NflCalcXF.Services.Repository.GetTextFileOnLine("Spread")) {
-            spreadTable.ReadSpreadTable(f);
+         try {
+            StringReader srdr = await Repository.GetTextFileOnLine("Spread");
+            if (srdr == null) return false;
+
+            spreadTable.ReadSpreadTable(srdr);
             Debug.Write(System.Environment.UserName);
-            f.Close();
+            srdr.Close();
+            return true;
+         }
+         catch (Exception ex) {
+            return false;
          }
 
       }
 
 
-      public void FillResultsTemplate() {
-      // --------------------------------------------------------
-         using (StreamReader f = NflCalcXF.Services.Repository.GetTextFileOnLine("Results")) {
-            resultsStringTemplate = f.ReadToEnd();
+      public async Task<bool> FillResultsTemplate() {
+         // --------------------------------------------------------
+         try {
+            StringReader srdr = await Repository.GetTextFileOnLine("Results");
+            if (srdr == null) return false;
+
+            resultsStringTemplate = srdr.ReadToEnd();
             resultsString = new StringBuilder();
-            f.Close();
+            srdr.Close();
+            return true;
          }
+         catch {
+            return false;
+         }
+
       }
 
 
-      public void FillSchedule() {
+      public async Task<bool> FillSchedule() {
          // -----------------------------------------------------------
-         string sched;
-         using (StreamReader f = NflCalcXF.Services.Repository.GetTextFileOnLine("Schedule")) {
-            sched = f.ReadToEnd();
+         try {
+            StringReader sr = await Repository.GetTextFileOnLine("Schedule");
+            if (sr == null) return false;
+
+            confs.Clear();
+            confs.Add("NFC", new CConference { ConferenceName = "NFC" });
+            confs.Add("AFC", new CConference { ConferenceName = "AFC" });
+            confs["NFC"].divs.Add("NFC-E", new CDivision { DivisionName = "NFC-E" });
+            confs["NFC"].divs.Add("NFC-N", new CDivision { DivisionName = "NFC-N" });
+            confs["NFC"].divs.Add("NFC-S", new CDivision { DivisionName = "NFC-S" });
+            confs["NFC"].divs.Add("NFC-W", new CDivision { DivisionName = "NFC-W" });
+            confs["AFC"].divs.Add("AFC-E", new CDivision { DivisionName = "AFC-E" });
+            confs["AFC"].divs.Add("AFC-N", new CDivision { DivisionName = "AFC-N" });
+            confs["AFC"].divs.Add("AFC-S", new CDivision { DivisionName = "AFC-S" });
+            confs["AFC"].divs.Add("AFC-W", new CDivision { DivisionName = "AFC-W" });
+
+
+            // Step 1. Read the teams...
+            int i = 0;
+            string rec = null;
+            string[] arec;
+            CTeam.teamIndexes = new Dictionary<string, short>();
+
+            rec = sr.ReadLine();
+            HomeAdvantage = double.Parse(rec.Split(new char[] { ' ' })[1]);
+            while ((rec = sr.ReadLine()) != "") {
+               arec = rec.Split(new char[] { ' ' }, StringSplitOptions.RemoveEmptyEntries);
+               short ix = short.Parse(arec[0]); ix--;
+               if (ix > 31) throw new Exception("More than 32 teams!");
+               string tag = arec[1];
+               string div = arec[2];
+               string conf = div.Substring(0, 3);
+               double rtg = double.Parse(arec[3]);
+               CSeason.Teams[ix] = new CTeam(ix, tag, conf, div, rtg);
+               CTeam.teamIndexes.Add(tag, ix);
+               confs[conf].divs[div].teams.Add(Teams[ix]);
+
+            }
+
+            // Step 2. Read the games, past & future...
+            i = 0;
+            while ((rec = sr.ReadLine()) != null) {
+               if (rec.Trim() == "") continue;
+               arec = rec.Split(new char[] { ' ' }, StringSplitOptions.RemoveEmptyEntries);
+               CGame g = new CGame(arec, i);
+               g.TeamV.teamSchedule.Add(g);
+               g.TeamH.teamSchedule.Add(g);
+               regSeason[i] = g;
+               i++;
+            }
+            return true;
+
          }
-         var sr = new StringReader(sched);
+         catch {
+            return false;
 
-         confs.Clear();
-         confs.Add("NFC", new CConference {ConferenceName = "NFC"});
-         confs.Add("AFC", new CConference {ConferenceName = "AFC"});
-         confs["NFC"].divs.Add("NFC-E", new CDivision {DivisionName = "NFC-E"});
-         confs["NFC"].divs.Add("NFC-N", new CDivision {DivisionName = "NFC-N"});
-         confs["NFC"].divs.Add("NFC-S", new CDivision {DivisionName = "NFC-S"});
-         confs["NFC"].divs.Add("NFC-W", new CDivision {DivisionName = "NFC-W"});
-         confs["AFC"].divs.Add("AFC-E", new CDivision {DivisionName = "AFC-E"});
-         confs["AFC"].divs.Add("AFC-N", new CDivision {DivisionName = "AFC-N"});
-         confs["AFC"].divs.Add("AFC-S", new CDivision {DivisionName = "AFC-S"});
-         confs["AFC"].divs.Add("AFC-W", new CDivision {DivisionName = "AFC-W"});
-
-
-         // Step 1. Read the teams...
-         int i = 0;
-         string rec = null;
-         string[] arec;
-         CTeam.teamIndexes = new Dictionary<string, short>();
-
-         rec = sr.ReadLine();
-         HomeAdvantage = double.Parse(rec.Split(new char[] {' '})[1]);
-         while ((rec = sr.ReadLine()) != "") {
-            arec = rec.Split(new char[] { ' ' }, StringSplitOptions.RemoveEmptyEntries);
-            short ix = short.Parse(arec[0]); ix--;
-            if (ix > 31) throw new Exception("More than 32 teams!");
-            string tag = arec[1];
-            string div = arec[2];
-            string conf = div.Substring(0, 3);
-            double rtg = double.Parse(arec[3]);
-            CSeason.Teams[ix] = new CTeam(ix, tag, conf, div, rtg);
-            CTeam.teamIndexes.Add(tag, ix);
-            confs[conf].divs[div].teams.Add(Teams[ix]);
-
-         }
-
-         // Step 2. Read the games, past & future...
-         i = 0;
-         while ((rec = sr.ReadLine()) != null) {
-            if (rec.Trim() == "") continue;
-            arec = rec.Split(new char[] { ' ' }, StringSplitOptions.RemoveEmptyEntries);
-            CGame g = new CGame(arec, i);
-            g.TeamV.teamSchedule.Add(g);
-            g.TeamH.teamSchedule.Add(g);
-            regSeason[i] = g;
-            i++;
          }
 
       }
 
 
-      public int FetchData() {
+      public async Task<int> FetchData() {
          // ------------------------------------------------------------
          // Return values:
          //   0: Success, continue
@@ -158,10 +179,11 @@ namespace NflCalc {
          if (!this.HasData) {
          // There is no data... so read all the files...
             try {
-               DateTime dtm = GetDataDate();
-               FillSpreadTable();
-               FillResultsTemplate();
-               FillSchedule();
+               DateTime dtm = await GetDataDate();
+               if (dtm == DateTime.MinValue) return -1;
+               if (!await FillSpreadTable()) return -1;
+               if (!await FillResultsTemplate()) return -1;
+               if (!await FillSchedule()) return -1; ;
                this.HasData = true;
                this.DataDate = dtm;
                return 0;
@@ -174,7 +196,8 @@ namespace NflCalc {
          // There *is* already data... Check it for currency...
             DateTime dtm;
             try {
-               dtm = GetDataDate();
+               dtm = await GetDataDate();
+               if (dtm == DateTime.MinValue) return 1;
             }
             catch (Exception ex) {
                return 1;
@@ -182,7 +205,7 @@ namespace NflCalc {
             if (this.DataDate < dtm) {
                // There is data, but schedule is out of date...
                try {
-                  FillSchedule();
+                  if (!await FillSchedule()) return -1;
                   this.DataDate = dtm; 
                   return 0;
                }

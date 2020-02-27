@@ -33,13 +33,9 @@ namespace NflCalc {
       }
 
 
-      public void ReadSpreadTable(StreamReader f) {
+      public void ReadSpreadTable(StringReader sr) {
       // ---------------------------------------------
          string rec;
-         rec = f.ReadToEnd();
-         f.Close();
-         var sr = new StringReader(rec);
-
          while ((rec = sr.ReadLine()) != null) {
             if (rec.Trim() == "") {
                sr.Close();
@@ -50,7 +46,6 @@ namespace NflCalc {
             table.Add(e);
          }
       }
-
 
    }
 

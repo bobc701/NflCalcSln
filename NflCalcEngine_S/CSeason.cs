@@ -148,7 +148,7 @@ namespace NflCalc {
       }
 
 
-      public int FetchData() {
+      public (int, string) FetchData() {
          // ------------------------------------------------------------
          // Return values:
          //   0: Success, continue
@@ -164,10 +164,10 @@ namespace NflCalc {
                FillSchedule();
                this.HasData = true;
                this.DataDate = dtm;
-               return 0;
+               return (0, "ok");
             }
             catch (Exception ex) {
-               return -1;
+               return (-1, ex.Message);
             }
          }
          else {
@@ -177,22 +177,22 @@ namespace NflCalc {
                dtm = GetDataDate();
             }
             catch (Exception ex) {
-               return 1;
+               return (1, ex.Message);
             }
             if (this.DataDate < dtm) {
                // There is data, but schedule is out of date...
                try {
                   FillSchedule();
-                  this.DataDate = dtm; 
-                  return 0;
+                  this.DataDate = dtm;
+                  return (0, "ok");
                }
                catch (Exception ex) {
                   this.HasData = false; //If couldn't read schedule, say no data...
-                  return -1;
+                  return (-1, ex.Message);
                }
             }
             else
-               return 0;
+               return (0, "ok");
          }
 
       }

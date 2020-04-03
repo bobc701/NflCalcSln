@@ -386,45 +386,83 @@ namespace NflCalc {
                   rg.StandingsString(new string[] { "<-- 1st seed", "<-- 2nd seed", "<-- 3rd seed", "<-- 4th seed" }));
             }
 
-            // Now drop the div winners into sseeds 1 to 4...
+         // -------------------------------------------
+         // Now drop the div winners into sseeds 1 to 4
+         // ------------------------------------------
             c.seeds[1] = teamList[0]; c.seeds[1].tots.Div++;
             c.seeds[2] = teamList[1]; c.seeds[2].tots.Div++;
             c.seeds[3] = teamList[2]; c.seeds[3].tots.Div++;
             c.seeds[4] = teamList[3]; c.seeds[4].tots.Div++;
 
-            // Now, Get #5 seed among the 4 2nd placers...
+            // For the 14 team post-season, we need a new concept, which keeps
+            // track of the lowest ranking (highest index) team in each div that 
+            // has made the playoffs. So initially, all 4 dives will be = 1 (2nd place).
+            var maxix = new Dictionary<string, int>();
+            foreach (CDivision d in c.divs.Values) {
+               maxix.Add(d.DivisionName, 0);
+            }
+
+         // ----------------------------------------
+         // Now, Get #5 seed among the 4 2nd placers
+         // ----------------------------------------
             teamList.Clear();
             foreach (var d in c.divs.Values) {
                teamList.Add(d.teams[1]); //Add second place teams
             }
             rg = new CStandingsGroup(teamList, detailMode);
             teamList = rg.RankTeams('c');
-            c.seeds[5] = teamList[0];
+            c.seeds[5] = teamList[0];    //Assign seed #5
+         // Increment max index of teams in this div that have made postseason so far.
+            maxix[teamList[0].divName]++; 
+
             if (detailMode) {
                resultsString.Replace("{" + c.ConferenceName + "-5}", 
                   rg.StandingsString(new string[] { "<-- 5th seed", "", "", "" }));
             }
 
-         // Finally, get #6 seed from 3 second places and one 3rd place...
-            CDivision d1 = c.divs[teamList[0].divName]; //Division of #5 seed
+         // --------------------------------------------------------
+         // Next, get #6 seed from 3 second places and one 3rd place
+         // --------------------------------------------------------
             teamList.Clear();
-            teamList.Add(d1.teams[2]); //3rd place team of div of #5 seed.
             foreach (var d in c.divs.Values) {
-               if (d1 != d) teamList.Add(d.teams[1]); //Add second place teams
+               teamList.Add(d.teams[maxix[d.DivisionName]]); //Will be 3-2nd place and 1-3rd place team
             }
 
             rg = new CStandingsGroup(teamList, detailMode);
             teamList = rg.RankTeams('c');
-            c.seeds[6] = teamList[0];
+            c.seeds[6] = teamList[0]; //Assign seed #6
+         // Increment max index of teams in this div that have made postseason so far.
+         // At this point it will be like 1,1,0,0 or like 2,0,0,0.
+            maxix[teamList[0].divName]++; 
+
             if (detailMode) {
                resultsString.Replace("{" + c.ConferenceName + "-6}", 
                rg.StandingsString(new string[] { "<-- 6th seed", "", "", "" }));
             }
 
-            // Store the seed number with the team irself.
-            // This will be needed in the post-season for reseeding.
+         // --------------------
+         // Finally, get #7 seed
+         // --------------------
+         // Note that d.Teams is sorted by standing (0..3)
+            teamList.Clear();
+            foreach (var d in c.divs.Values) {
+               teamList.Add(d.teams[maxix[d.DivisionName]]); //Could be 2nd or 3rd or even 4th place teams
+            }
+            rg = new CStandingsGroup(teamList, detailMode);
+            teamList = rg.RankTeams('c');
+            c.seeds[7] = teamList[0]; //Assign seed #7
+
+            if (detailMode) {
+               resultsString.Replace("{" + c.ConferenceName + "-7}",
+               rg.StandingsString(new string[] { "<-- 7th seed", "", "", "" }));
+            }
+
+         // ------------------------------------------
+         // Store the seed number with the team irself
+         // ------------------------------------------
+         // This will be needed in the post-season for reseeding.
             var rec = new StringBuilder();
-            for (int s = 1; s <= 6; s++) { 
+            for (int s = 1; s <= 7; s++) { 
                c.seeds[s].Seed = s; 
                c.seeds[s].tots.Playoffs++; 
                rec.AppendLine(string.Format(" {0,1}. {1,-3}", s, c.seeds[s].teamTag));
@@ -433,7 +471,7 @@ namespace NflCalc {
             if (detailMode) { 
                Debug.WriteLine("");
                Debug.WriteLine("Seeds:");
-               for (int s = 1; s <= 6; s++) Debug.WriteLine(s.ToString() + ". " + c.seeds[s].teamTag);
+               for (int s = 1; s <= 7; s++) Debug.WriteLine(s.ToString() + ". " + c.seeds[s].teamTag);
             }
          }
 
@@ -450,21 +488,24 @@ namespace NflCalc {
       // Round 1 (Wildcard round)...
 
          foreach (CConference conf in confs.Values) {
-            conf.Round1[0] = new CGame(conf.seeds[6], conf.seeds[3], ESite.Home);
-            conf.Round1[1] = new CGame(conf.seeds[5], conf.seeds[4], ESite.Home);
+            conf.Round1[0] = new CGame(conf.seeds[7], conf.seeds[2], ESite.Home);
+            conf.Round1[1] = new CGame(conf.seeds[6], conf.seeds[3], ESite.Home);
+            conf.Round1[2] = new CGame(conf.seeds[5], conf.seeds[4], ESite.Home);
 
             conf.Round1[0].PlayGame(true);
             conf.Round1[1].PlayGame(true);
+            conf.Round1[2].PlayGame(true);
 
          // Round 2 (Divisional round)...
 
             List<CTeam> teams = new List<CTeam>();
             teams.Add(conf.Round1[0].Winner);
             teams.Add(conf.Round1[1].Winner);
-            teams = teams.OrderBy(t => t.Seed).ToList<CTeam>();
+            teams.Add(conf.Round1[2].Winner);
+            teams = teams.OrderBy(t => t.Seed).ToList<CTeam>(); //Reseed the round 1 winners
 
-            conf.Round2[0] = new CGame(teams[0], conf.seeds[2], ESite.Home);
-            conf.Round2[1] = new CGame(teams[1], conf.seeds[1], ESite.Home);
+            conf.Round2[0] = new CGame(teams[1], teams[0], ESite.Home);
+            conf.Round2[1] = new CGame(teams[2], conf.seeds[1], ESite.Home); //#1 seed makes appearance
 
             conf.Round2[0].PlayGame(true);
             conf.Round2[1].PlayGame(true);
@@ -490,7 +531,9 @@ namespace NflCalc {
          SuperBowl.PlayGame(true);
          SuperBowl.Winner.tots.SB++;
 
+
          if (detailMode) {
+         // Format the results for single-season display...
 
             var s = new StringBuilder();
             s.AppendLine(" " +
@@ -500,11 +543,17 @@ namespace NflCalc {
                confs["NFC"].Round1[1].Winner.teamTag + " defeats " +
                confs["NFC"].Round1[1].Loser.teamTag);
             s.AppendLine(" " +
+               confs["NFC"].Round1[2].Winner.teamTag + " defeats " +
+               confs["NFC"].Round1[2].Loser.teamTag);
+            s.AppendLine(" " +
                confs["AFC"].Round1[0].Winner.teamTag + " defeats " +
                confs["AFC"].Round1[0].Loser.teamTag);
             s.AppendLine(" " +
                confs["AFC"].Round1[1].Winner.teamTag + " defeats " +
                confs["AFC"].Round1[1].Loser.teamTag);
+            s.AppendLine(" " +
+               confs["AFC"].Round1[2].Winner.teamTag + " defeats " +
+               confs["AFC"].Round1[2].Loser.teamTag);
             resultsString.Replace("{ROUND-1}", s.ToString());
 
             s.Clear();

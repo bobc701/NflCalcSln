@@ -15,9 +15,9 @@ namespace NflCalc {
    // -----------------------------------------------------------
       public string ConferenceName;
       public Dictionary<string, CDivision> divs = new Dictionary<string, CDivision>();
-      public CTeam[] seeds = new CTeam[7]; //We ignore 0, use 1..6
+      public CTeam[] seeds = new CTeam[8]; //We ignore 0, use 1..7
 
-      public CGame[] Round1 = new CGame[2];
+      public CGame[] Round1 = new CGame[3];
       public CGame[] Round2 = new CGame[2];
       public CGame Round3;
 
@@ -28,6 +28,7 @@ namespace NflCalc {
    // ---------------------------------------------------------
       public string DivisionName;
       public List<CTeam> teams = new List<CTeam>();
+      public int MaxIx = 0; // Highest index that has made the playoffs thus far in that calcs.
       //public CTeam[] standings = new CTeam[5];
 
    }
@@ -394,13 +395,13 @@ namespace NflCalc {
             c.seeds[3] = teamList[2]; c.seeds[3].tots.Div++;
             c.seeds[4] = teamList[3]; c.seeds[4].tots.Div++;
 
-            // For the 14 team post-season, we need a new concept, which keeps
-            // track of the lowest ranking (highest index) team in each div that 
-            // has made the playoffs. So initially, all 4 dives will be = 1 (2nd place).
-            var maxix = new Dictionary<string, int>();
-            foreach (CDivision d in c.divs.Values) {
-               maxix.Add(d.DivisionName, 0);
-            }
+            //// For the 14 team post-season, we need a new concept, which keeps
+            //// track of the lowest ranking (highest index) team in each div that 
+            //// has made the playoffs. So initially, all 4 dives will be = 1 (2nd place).
+            //var maxix = new Dictionary<string, int>();
+            //foreach (CDivision d in c.divs.Values) {
+            //   maxix.Add(d.DivisionName, 0);
+            //}
 
          // ----------------------------------------
          // Now, Get #5 seed among the 4 2nd placers
@@ -408,12 +409,13 @@ namespace NflCalc {
             teamList.Clear();
             foreach (var d in c.divs.Values) {
                teamList.Add(d.teams[1]); //Add second place teams
+               d.MaxIx = 0;
             }
             rg = new CStandingsGroup(teamList, detailMode);
             teamList = rg.RankTeams('c');
             c.seeds[5] = teamList[0];    //Assign seed #5
          // Increment max index of teams in this div that have made postseason so far.
-            maxix[teamList[0].divName]++; 
+            int n = ++c.divs[teamList[0].divName].MaxIx;
 
             if (detailMode) {
                resultsString.Replace("{" + c.ConferenceName + "-5}", 
@@ -425,7 +427,7 @@ namespace NflCalc {
          // --------------------------------------------------------
             teamList.Clear();
             foreach (var d in c.divs.Values) {
-               teamList.Add(d.teams[maxix[d.DivisionName]]); //Will be 3-2nd place and 1-3rd place team
+               teamList.Add(d.teams[d.MaxIx+1]); //Will be 3-2nd place and 1-3rd place team
             }
 
             rg = new CStandingsGroup(teamList, detailMode);
@@ -433,7 +435,7 @@ namespace NflCalc {
             c.seeds[6] = teamList[0]; //Assign seed #6
          // Increment max index of teams in this div that have made postseason so far.
          // At this point it will be like 1,1,0,0 or like 2,0,0,0.
-            maxix[teamList[0].divName]++; 
+            c.divs[teamList[0].divName].MaxIx++;
 
             if (detailMode) {
                resultsString.Replace("{" + c.ConferenceName + "-6}", 
@@ -446,7 +448,7 @@ namespace NflCalc {
          // Note that d.Teams is sorted by standing (0..3)
             teamList.Clear();
             foreach (var d in c.divs.Values) {
-               teamList.Add(d.teams[maxix[d.DivisionName]]); //Could be 2nd or 3rd or even 4th place teams
+               teamList.Add(d.teams[d.MaxIx+1]); //Could be 2nd or 3rd or even 4th place teams
             }
             rg = new CStandingsGroup(teamList, detailMode);
             teamList = rg.RankTeams('c');

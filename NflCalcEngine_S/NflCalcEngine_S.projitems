@@ -16,4 +16,7 @@
     <Compile Include="$(MSBuildThisFileDirectory)CTeam.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)ExtentionMethods.cs" />
   </ItemGroup>
+  <ItemGroup>
+    <Content Include="$(MSBuildThisFileDirectory)%40Notes.txt" />
+  </ItemGroup>
 </Project>

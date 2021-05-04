@@ -39,8 +39,8 @@ namespace NflCalc {
       public DateTime DataDate { get; set; }     //New 6'18
 
       private const int tms = 32;
-      private const int wks = 17;
-      public CGame[] regSeason = new CGame[256];
+      private const int wks = 18;
+      public CGame[] regSeason = new CGame[272];
       public CGame[][] postSeason = { new CGame[4], new CGame[4], new CGame[2], new CGame[1] };
       public static CTeam[] Teams = new CTeam[32];
       public static Dictionary<string, CConference> confs = new Dictionary<string, CConference>();
